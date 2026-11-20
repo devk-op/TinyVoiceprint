@@ -1,0 +1,22 @@
+load("@pigweed//pw_unit_test:pw_cc_test.bzl", "pw_cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])
+
+cc_library(
+    name = "voice_match",
+    srcs = ["voice_match.cc"],
+    hdrs = ["voice_match.h"],
+    deps = ["//modules/voiceprint"],
+)
+
+# Runs on the host: bazel test //modules/voice_match:voice_match_test
+pw_cc_test(
+    name = "voice_match_test",
+    srcs = ["voice_match_test.cc"],
+    deps = [
+        ":voice_match",
+        "//modules/voiceprint:voiceprint_selftest",
+    ],
+)

@@ -1,0 +1,31 @@
+load("@pigweed//pw_unit_test:pw_cc_test.bzl", "pw_cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])
+
+# The record log; portable, tested on the host.
+cc_library(
+    name = "voice_store",
+    srcs = ["voice_store.cc"],
+    hdrs = ["voice_store.h"],
+)
+
+# The board's flash sector 11, and the tag of the compiled-in model.
+cc_library(
+    name = "stm32_flash",
+    srcs = ["stm32_flash.cc"],
+    hdrs = ["stm32_flash.h"],
+    deps = [
+        ":voice_store",
+        "//modules/voiceprint",
+        "@pigweed//third_party/stm32cube",
+    ],
+)
+
+# Runs on the host: bazel test //modules/voice_store:voice_store_test
+pw_cc_test(
+    name = "voice_store_test",
+    srcs = ["voice_store_test.cc"],
+    deps = [":voice_store"],
+)

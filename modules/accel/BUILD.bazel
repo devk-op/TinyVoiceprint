@@ -1,0 +1,13 @@
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])
+
+cc_library(
+    name = "lis3dsh",
+    srcs = ["lis3dsh.cc"],
+    hdrs = ["lis3dsh.h"],
+    deps = [
+        "@pigweed//pw_status",
+        "@pigweed//third_party/stm32cube",
+    ],
+)

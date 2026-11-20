@@ -1,0 +1,27 @@
+load("@pigweed//pw_build:pw_cc_binary.bzl", "pw_cc_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])
+
+pw_cc_binary(
+    name = "app",
+    srcs = ["main.cc"],
+    deps = [
+        "//modules/features:log_mel",
+        "//modules/features:log_mel_selftest",
+        "//modules/mic:mp45dt02",
+        "//modules/pdm:pdm_decimator",
+        "//modules/usb_audio",
+        "//modules/voice_match",
+        "//modules/voice_store",
+        "//modules/voice_store:stm32_flash",
+        "//modules/voiceprint",
+        "//modules/voiceprint:voiceprint_selftest",
+        # Boot code, vector table and linker script for the board.
+        "//targets/stm32f407g_disc1:extra_platform_libs",
+        "@freertos",
+        "@pigweed//pw_log",
+        "@pigweed//third_party/stm32cube",
+    ],
+)

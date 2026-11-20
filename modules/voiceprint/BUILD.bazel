@@ -1,0 +1,45 @@
+load("@pigweed//pw_unit_test:pw_cc_test.bzl", "pw_cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])
+
+# The 8-bit speaker encoder. voiceprint_model.* and voiceprint_golden.h are
+# generated:
+#   uv run tools/train/tcs_integer.py tcs_noise --write
+cc_library(
+    name = "voiceprint",
+    srcs = [
+        "voiceprint.cc",
+        "voiceprint_model.cc",
+    ],
+    hdrs = [
+        "voiceprint.h",
+        "voiceprint_model.h",
+    ],
+    # The toolchain default is -Oz (smallest code); the convolution loops
+    # are where the time goes.
+    copts = ["-O2"],
+)
+
+# One real window of speech with the reference model's outputs, and the
+# check that compares Voiceprint against them.
+cc_library(
+    name = "voiceprint_selftest",
+    srcs = ["voiceprint_selftest.cc"],
+    hdrs = [
+        "voiceprint_golden.h",
+        "voiceprint_selftest.h",
+    ],
+    deps = [":voiceprint"],
+)
+
+# Runs on the host: bazel test //modules/voiceprint:voiceprint_test
+pw_cc_test(
+    name = "voiceprint_test",
+    srcs = ["voiceprint_test.cc"],
+    deps = [
+        ":voiceprint",
+        ":voiceprint_selftest",
+    ],
+)

@@ -1,0 +1,58 @@
+--- a/src/portable/synopsys/dwc2/dcd_dwc2.c	2025-11-19 18:41:11
++++ b/src/portable/synopsys/dwc2/dcd_dwc2.c	2026-10-30 15:48:04
+@@ -634,6 +634,15 @@
+   edpt_disable(rhport, p_endpoint_desc->bEndpointAddress, false);
+   edpt_activate(rhport, p_endpoint_desc);
+   return true;
++}
++
++// device_ml patch: TinyUSB 0.20.0's audio class queues ISO transfers from the
++// USB ISR (xfer_isr), but these functions always took the task-level lock,
++// which on FreeRTOS is taskENTER_CRITICAL() and asserts inside an ISR.
++// Detect the context at runtime instead. Fixed upstream after 0.20.0 by
++// threading an is_isr argument through the DCD API.
++static inline bool edpt_xfer_in_isr(void) {
++  return (SCB->ICSR & SCB_ICSR_VECTACTIVE_Msk) != 0;
+ }
+ 
+ bool dcd_edpt_xfer(uint8_t rhport, uint8_t ep_addr, uint8_t* buffer, uint16_t total_bytes) {
+@@ -641,8 +650,9 @@
+   uint8_t const dir = tu_edpt_dir(ep_addr);
+   xfer_ctl_t* xfer = XFER_CTL_BASE(epnum, dir);
+   bool ret;
++  bool const in_isr = edpt_xfer_in_isr();
+ 
+-  usbd_spin_lock(false);
++  usbd_spin_lock(in_isr);
+ 
+   if (xfer->max_size == 0) {
+     ret = false;  // Endpoint is closed
+@@ -662,7 +672,7 @@
+     ret = true;
+   }
+ 
+-  usbd_spin_unlock(false);
++  usbd_spin_unlock(in_isr);
+ 
+   return ret;
+ }
+@@ -679,8 +689,9 @@
+   uint8_t const dir = tu_edpt_dir(ep_addr);
+   xfer_ctl_t* xfer = XFER_CTL_BASE(epnum, dir);
+   bool ret;
++  bool const in_isr = edpt_xfer_in_isr();
+ 
+-  usbd_spin_lock(false);
++  usbd_spin_lock(in_isr);
+ 
+   if (xfer->max_size == 0) {
+     ret = false;  // Endpoint is closed
+@@ -696,7 +707,7 @@
+     ret = true;
+   }
+ 
+-  usbd_spin_unlock(false);
++  usbd_spin_unlock(in_isr);
+ 
+   return ret;
+ }

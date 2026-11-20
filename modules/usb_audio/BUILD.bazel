@@ -1,0 +1,40 @@
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])
+
+# tusb_config.h, wired into TinyUSB via the @tinyusb//:tinyusb_config flag
+# on the stm32f407g_freertos platform.
+cc_library(
+    name = "tusb_config",
+    hdrs = ["tusb_config.h"],
+    includes = ["."],
+)
+
+cc_library(
+    name = "ids",
+    hdrs = ["usb_audio_ids.h"],
+)
+
+# Descriptor callbacks, wired in via the @tinyusb//:tinyusb_descriptors flag.
+cc_library(
+    name = "descriptors",
+    srcs = ["usb_descriptors.c"],
+    deps = [
+        ":ids",
+        "@pigweed//third_party/stm32cube",
+        "@tinyusb//:tinyusb_headers",
+    ],
+)
+
+cc_library(
+    name = "usb_audio",
+    srcs = ["usb_audio.cc"],
+    hdrs = ["usb_audio.h"],
+    deps = [
+        ":ids",
+        "@freertos",
+        "@pigweed//third_party/stm32cube",
+        "@tinyusb",
+        "@tinyusb//:device_audio",
+    ],
+)

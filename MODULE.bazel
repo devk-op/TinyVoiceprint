@@ -1,0 +1,81 @@
+# device_ml: real-time audio DSP on STM32F407G-DISC1 using Pigweed.
+
+module(
+    name = "device_ml",
+)
+
+# Xcode-aware macOS host toolchain. Newer Xcode clang reports SDKSettings.json as an
+# include dependency; the default auto-configured toolchain rejects that as an
+# "absolute path inclusion" when building host tools (e.g. protobuf). Must come
+# before rules_cc so its toolchain is registered first.
+bazel_dep(name = "apple_support", version = "2.11.0", repo_name = "build_bazel_apple_support")
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "freertos", version = "11.1.0.bcr.3")
+bazel_dep(name = "pigweed")
+bazel_dep(name = "platforms", version = "0.0.10")
+bazel_dep(name = "rules_cc", version = "0.0.17")
+
+# Pigweed is not published to the Bazel Central Registry; pin it to a specific
+# commit on the main branch, mirroring the pattern used by Pigweed's own
+# Bazel quickstart (pigweed.googlesource.com/pigweed/quickstart/bazel).
+#
+# TODO: bump this pin periodically; it is not auto-rolled.
+git_override(
+    module_name = "pigweed",
+    commit = "17fee2ef9e6afdfe63d0f484a1826e38e8ca176d",
+    remote = "https://pigweed.googlesource.com/pigweed/pigweed",
+)
+
+# STM32Cube HAL + CMSIS vendoring for the F4 family.
+#
+# These are one-off external libraries not in the BCR, mirrored from
+# pigweed's own MODULE.bazel (same F4-family packages used by
+# targets/stm32f429i_disc1_stm32cube/ upstream -- STM32F407 and STM32F429
+# share the same HAL/CMSIS package, only the PRODUCT define differs).
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "stm32f4xx_hal_driver",
+    build_file = "@pigweed//third_party/stm32cube:stm32_hal_driver.BUILD.bazel",
+    sha256 = "d0427a3830f0c23dd4810952321b8209be7b3c50897d1fc2d79587435cc3a379",
+    strip_prefix = "stm32f4xx-hal-driver-1.8.0",
+    urls = ["https://github.com/STMicroelectronics/stm32f4xx-hal-driver/archive/refs/tags/v1.8.0.tar.gz"],
+)
+
+http_archive(
+    name = "cmsis_device_f4",
+    build_file = "@pigweed//third_party/stm32cube:cmsis_device.BUILD.bazel",
+    sha256 = "1d9612ecaaab8708c88be2c9573927f2e5e9a911aa2c1427182b545ed5ed0fd6",
+    strip_prefix = "cmsis-device-f4-2.6.8",
+    urls = ["https://github.com/STMicroelectronics/cmsis-device-f4/archive/refs/tags/v2.6.8.tar.gz"],
+)
+
+http_archive(
+    name = "cmsis_core",
+    build_file = "@pigweed//third_party/stm32cube:cmsis_core.BUILD.bazel",
+    sha256 = "32f226c31d7d1ff4a504404400603e047b99f405cd0c9a8f417f1f250251b829",
+    strip_prefix = "cmsis-core-5.4.0_cm4",
+    urls = ["https://github.com/STMicroelectronics/cmsis-core/archive/refs/tags/v5.4.0_cm4.tar.gz"],
+)
+
+# TinyUSB, for presenting the board to the host as a USB Audio Class 2
+# microphone. Pigweed ships the BUILD file but doesn't pin a release for
+# Bazel; 0.20.0 contains every source that BUILD file lists.
+http_archive(
+    name = "tinyusb",
+    build_file = "@pigweed//third_party/tinyusb:tinyusb.BUILD.bazel",
+    # 0.20.0's DWC2 driver takes a task-level lock on a path the audio class
+    # now runs from the USB ISR, which trips FreeRTOS's critical-section
+    # assert as soon as the host starts streaming. Fixed upstream after
+    # 0.20.0; drop this patch when moving to a release that includes it.
+    patch_args = ["-p1"],
+    patches = ["//third_party/tinyusb:dwc2_edpt_xfer_isr_lock.patch"],
+    sha256 = "fa33ec5a29d75e5a033ad5cdf4a91ad0bb19005f6daed0d93fd293e9f3d052b4",
+    strip_prefix = "tinyusb-0.20.0",
+    urls = ["https://github.com/hathach/tinyusb/archive/refs/tags/0.20.0.tar.gz"],
+)
+
+# Register Pigweed's Cortex-M4 C++ toolchain.
+register_toolchains(
+    "@pigweed//pw_toolchain:cc_toolchain_cortex-m4",
+)

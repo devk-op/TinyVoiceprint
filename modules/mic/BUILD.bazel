@@ -1,0 +1,14 @@
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])
+
+cc_library(
+    name = "mp45dt02",
+    srcs = ["mp45dt02.cc"],
+    hdrs = ["mp45dt02.h"],
+    deps = [
+        "@freertos",
+        "@pigweed//pw_status",
+        "@pigweed//third_party/stm32cube",
+    ],
+)

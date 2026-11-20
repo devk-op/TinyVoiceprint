@@ -1,0 +1,37 @@
+load("@pigweed//pw_unit_test:pw_cc_test.bzl", "pw_cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])
+
+cc_library(
+    name = "log_mel",
+    srcs = ["log_mel.cc"],
+    hdrs = ["log_mel.h"],
+    # The toolchain default is -Oz (smallest code). Measured on the board,
+    # -O2 makes a feature frame 13% faster (0.84 ms -> 0.73 ms).
+    copts = ["-O2"],
+)
+
+# Golden values from the Python reference, plus the check that compares
+# LogMel against them. Regenerate log_mel_golden.h with:
+#   uv run tools/host/log_mel_reference.py
+cc_library(
+    name = "log_mel_selftest",
+    srcs = ["log_mel_selftest.cc"],
+    hdrs = [
+        "log_mel_golden.h",
+        "log_mel_selftest.h",
+    ],
+    deps = [":log_mel"],
+)
+
+# Runs on the host: bazel test //modules/features:log_mel_test
+pw_cc_test(
+    name = "log_mel_test",
+    srcs = ["log_mel_test.cc"],
+    deps = [
+        ":log_mel",
+        ":log_mel_selftest",
+    ],
+)

@@ -1,0 +1,18 @@
+load("@pigweed//pw_unit_test:pw_cc_test.bzl", "pw_cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])
+
+cc_library(
+    name = "pdm_decimator",
+    srcs = ["pdm_decimator.cc"],
+    hdrs = ["pdm_decimator.h"],
+)
+
+# Runs on the host: bazel test //modules/pdm:pdm_decimator_test
+pw_cc_test(
+    name = "pdm_decimator_test",
+    srcs = ["pdm_decimator_test.cc"],
+    deps = [":pdm_decimator"],
+)

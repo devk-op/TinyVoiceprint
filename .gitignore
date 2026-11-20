@@ -1,0 +1,22 @@
+# Bazel
+bazel-*
+MODULE.bazel.lock
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Editor/OS
+.DS_Store
+.vscode/
+*.swp
+
+# Host-side audio captures
+recordings/
+
+# Datasets and training artifacts
+data/
+
+# Built paper (rebuild: cd paper && tectonic -X compile main.tex)
+paper/main.pdf

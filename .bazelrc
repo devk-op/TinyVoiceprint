@@ -1,0 +1,14 @@
+# Pigweed's STM32Cube HAL indirection: point the family-agnostic hal_driver
+# label_flag (defined in @pigweed//third_party/stm32cube) at the F4 packages
+# vendored in MODULE.bazel.
+common --@pigweed//third_party/stm32cube:hal_driver=@stm32f4xx_hal_driver//:hal_driver
+common --@stm32f4xx_hal_driver//:cmsis_device=@cmsis_device_f4//:cmsis_device
+common --@stm32f4xx_hal_driver//:cmsis_init=@cmsis_device_f4//:default_cmsis_init
+common --@cmsis_device_f4//:cmsis_core=@cmsis_core
+
+# FreeRTOS config used across the project (static allocation only).
+build --@freertos//:freertos_config=//targets/stm32f407g_disc1:freertos_config
+
+# Config for the stm32f407g_disc1 HAL + FreeRTOS platform.
+# Usage: bazel build --config=stm32f407g_disc1 //...
+build:stm32f407g_disc1 --platforms=//targets/stm32f407g_disc1:stm32f407g_freertos
