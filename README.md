@@ -1,4 +1,4 @@
-# device_ml
+# TinyVoiceprint
 
 Real-time, text-independent speaker verification on an STM32F407 (Cortex-M4F, 168 MHz).
 The board listens through its on-board PDM microphone, enrols any new voice on the device,
