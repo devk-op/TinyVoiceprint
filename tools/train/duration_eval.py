@@ -50,9 +50,15 @@ def load(name: str):
     """name, name.int8 (8-bit float simulation) or name.int (tcs only: the
     chip's integer arithmetic, tcs_integer.py)."""
     base = name.removesuffix(".int8").removesuffix(".int")
+    # Seed once, before building the model, exactly as tcs_integer.py does when
+    # it writes the firmware: building the model consumes torch's random state,
+    # and the calibration subsamples activations with torch.randperm, so
+    # re-seeding after the build gives slightly different scales (input scale
+    # 0.104177 vs the chip's 0.104001 for tcs_noise) and a network that is close
+    # to, but not bit-exact with, the one on the chip.
+    torch.manual_seed(0)
     model = quantize.load_float(base)
     if name != base:
-        torch.manual_seed(0)
         model = quantize.quantize(model, quantize.calibration_crops(1000), 99.99)
     if name.endswith(".int"):
         import tcs_integer

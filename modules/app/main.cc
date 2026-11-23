@@ -27,6 +27,7 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <new>
 
 #include "FreeRTOS.h"
 #include "modules/features/log_mel.h"
@@ -75,7 +76,7 @@ DeviceMlPerf device_ml_perf = {};
 // Live voice-match state. `command` and `threshold` may be written from the
 // host over SWD (tools/host/read_perf.py --enroll / --clear / --threshold).
 struct DeviceMlVoice {
-  uint32_t command;  // Write 1 to start enrollment, 2 to clear it.
+  uint32_t command;  // 1: start enrollment, 2: clear it, 3: chip check.
   float threshold;  // Match threshold on the score.
   uint32_t result;  // Latest VoiceMatch::Result.
   float score;  // Latest smoothed score against the enrolled voice.
@@ -98,6 +99,25 @@ struct DeviceMlVoice {
   uint32_t store_free_slots;  // Saves left before the sector is compacted.
 };
 volatile DeviceMlVoice device_ml_voice = {};
+
+// Chip-vs-reference check (tools/host/chip_check.py). The host writes
+// kCheckSamples int16 PCM samples to the start of the otherwise unused CCM
+// RAM and sets device_ml_voice.command to 3; the match task computes log-mel
+// features and runs the network on them exactly as on live audio, then
+// publishes hashes of the int8 input and the convolution output (same FNV-1a
+// as the boot self-test) and the voiceprint, and increments `done`.
+struct DeviceMlCheck {
+  uint32_t done;
+  uint32_t frames;  // Feature frames produced; should be kFrames.
+  uint32_t input_hash;
+  uint32_t conv_hash;
+  uint32_t conv_bytes;
+  uint32_t cycles;  // Features and network.
+  uint32_t input_address;  // For dumping the int8 input on a mismatch.
+  uint32_t conv_address;
+  float embedding[device_ml::voiceprint::Voiceprint::kEmbeddingDim];
+};
+volatile DeviceMlCheck device_ml_check = {};
 }
 
 namespace {
@@ -225,6 +245,56 @@ void SetLed(uint16_t led, bool on) {
 
 // Makes a decision each time the audio task signals that another
 // kFramesPerDecision frames have arrived.
+// Runs the network on the PCM window the host left in CCM RAM. Only the match
+// task touches the voiceprint network, so this is safe between decisions.
+void RunChipCheck() {
+  using device_ml::voiceprint::Voiceprint;
+  constexpr uintptr_t kCcm = 0x10000000;  // 64 KB, core-only, unused otherwise.
+  constexpr size_t kCheckSamples =
+      LogMel::kFrameLength + (Voiceprint::kFrames - 1) * LogMel::kHop;
+  constexpr size_t kPcmBytes = kCheckSamples * sizeof(int16_t);
+  static_assert(kPcmBytes % 8 == 0);
+  static_assert(kPcmBytes + sizeof(LogMel) <= 64 * 1024, "CCM is 64 KB");
+  static LogMel* mel = new (reinterpret_cast<void*>(kCcm + kPcmBytes)) LogMel();
+  mel->Reset();
+  const auto* pcm = reinterpret_cast<const int16_t*>(kCcm);
+  // Frames overwrite PCM that has already been consumed: frame n is written
+  // at byte 160n once samples up to 400 + 160n have been read.
+  auto* frames = reinterpret_cast<float*>(kCcm);
+  size_t produced = 0;
+  const uint32_t start = Cycles();
+  mel->Process(pcm, kCheckSamples, [&](const LogMel::Frame& frame) {
+    if (produced < Voiceprint::kFrames) {
+      std::copy(frame.begin(), frame.end(), frames + produced * Voiceprint::kMels);
+    }
+    ++produced;
+  });
+  Voiceprint& voiceprint = voice_match.voiceprint();
+  float embedding[Voiceprint::kEmbeddingDim];
+  voiceprint.QuantizeInput(frames);
+  device_ml_check.input_hash = device_ml::voice_store::Fnv1a(
+      voiceprint.input(), Voiceprint::kFrames * Voiceprint::kMels);
+  // Keep a copy of the int8 input in free CCM (after the 24 KB of frames), so
+  // the host can compare it after the live pipeline has reused the buffer.
+  constexpr uintptr_t kInputCopy = kCcm + 24 * 1024;
+  static_assert(24 * 1024 + Voiceprint::kFrames * Voiceprint::kMels <= kPcmBytes);
+  std::copy_n(voiceprint.input(), Voiceprint::kFrames * Voiceprint::kMels,
+              reinterpret_cast<int8_t*>(kInputCopy));
+  voiceprint.RunConvolutions();
+  device_ml_check.conv_hash = device_ml::voice_store::Fnv1a(
+      voiceprint.conv_output(), voiceprint.conv_output_bytes());
+  voiceprint.PoolAndEmbed(embedding);
+  device_ml_check.cycles = Cycles() - start;
+  device_ml_check.frames = static_cast<uint32_t>(produced);
+  device_ml_check.conv_bytes = static_cast<uint32_t>(voiceprint.conv_output_bytes());
+  device_ml_check.input_address = kInputCopy;
+  device_ml_check.conv_address = reinterpret_cast<uintptr_t>(voiceprint.conv_output());
+  for (size_t i = 0; i < Voiceprint::kEmbeddingDim; ++i) {
+    device_ml_check.embedding[i] = embedding[i];
+  }
+  device_ml_check.done = device_ml_check.done + 1;
+}
+
 void MatchTask(void*) {
   using Result = VoiceMatch::Result;
   for (;;) {
@@ -251,6 +321,8 @@ void MatchTask(void*) {
       device_ml_voice.command = 0;
       if (command == 1) {
         voice_match.StartEnrollment();
+      } else if (command == 3) {
+        RunChipCheck();
       } else if (command == 2) {
         voice_match.ClearEnrollment();
         device_ml_voice.stored = Store().Clear() ? 3 : 4;

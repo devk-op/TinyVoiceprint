@@ -20,3 +20,7 @@ data/
 
 # Built paper (rebuild: cd paper && tectonic -X compile main.tex)
 paper/main.pdf
+
+# arXiv upload package (rebuild from paper/main.tex)
+paper/arxiv_upload.tar.gz
+paper/main_esl.pdf

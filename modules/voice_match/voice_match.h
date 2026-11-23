@@ -39,11 +39,13 @@ class VoiceMatch {
   // average voice (model::kAverageVoice).
   // For model tcs_noise, simulated with tools/train/board_sim.py on board
   // recordings (smoothed decisions): VoxCeleb1 replayed through the board,
-  // 39 speakers, false reject 8.1% and false accept 22.8% at 0.35 (7.3% and
-  // 23.7% without the average-voice check). Live (2026-11-19, free-talk
+  // 39 speakers, false reject 8.0% and false accept 22.9% at 0.35 (7.3% and
+  // 23.7% without the average-voice check; re-run 2026-11-22 with the chip's
+  // exact calibration). Live (2026-11-19, free-talk
   // enrolment): a video of another speaker was accepted in 4 of 66 speech
-  // decisions; chair squeaks scored 0.35-0.49 and matched without the check
-  // (offline the check rejects all of them). Model-specific: re-measure when
+  // decisions; chair squeaks scored 0.35-0.49 and matched without the check.
+  // With it, 4 of 110 logged squeak decisions matched on the chip (offline,
+  // on an earlier squeak recording, it rejected all of them). Model-specific: re-measure when
   // the model changes.
   static constexpr float kDefaultThreshold = 0.35f;
   // Decisions use the average of this many recent speech windows.

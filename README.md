@@ -1,5 +1,7 @@
 # TinyVoiceprint
 
+Paper: https://devk-op.github.io/tinyvoiceprint.pdf
+
 Real-time, text-independent speaker verification on an STM32F407 (Cortex-M4F, 168 MHz).
 The board listens through its on-board PDM microphone, enrols any new voice on the device,
 and, while someone is speaking, decides every 0.4 s whether it is the enrolled voice.
@@ -34,6 +36,7 @@ bazel test //modules/...
 bazel build --config=stm32f407g_disc1 //modules/app
 targets/stm32f407g_disc1/py/flash.py bazel-bin/modules/app/app
 uv run tools/host/read_perf.py          # self-test, timing and match state over SWD
+uv run tools/host/chip_check.py         # chip vs Python reference on 240 real windows
 ```
 
 To enrol, press the blue user button and talk for about 15 seconds. Blue LED: the enrolled
